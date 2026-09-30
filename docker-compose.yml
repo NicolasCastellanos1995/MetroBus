@@ -1,0 +1,56 @@
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: metrobus_postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-metrobus}
+      POSTGRES_USER: ${POSTGRES_USER:-metrobus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-metrobus}
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - metrobus_pgdata:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-metrobus} -d ${POSTGRES_DB:-metrobus}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+  etl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: metrobus_etl
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-metrobus}
+      POSTGRES_USER: ${POSTGRES_USER:-metrobus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-metrobus}
+
+    volumes:
+      # Los CSV originales son visibles desde el contenedor,
+      # pero el ETL no puede modificarlos.
+      - ./data/raw:/app/data/raw:ro
+
+
+volumes:
+  metrobus_pgdata:
