@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import URL, create_engine, text
 
 from .config import DB_CONFIG, ROOT_DIR
 
@@ -13,9 +13,13 @@ LOAD_ORDER = [
 
 def get_engine():
     c = DB_CONFIG
-    url = (
-        f"postgresql+psycopg2://{c['user']}:{c['password']}@"
-        f"{c['host']}:{c['port']}/{c['database']}"
+    url = URL.create(
+        drivername="postgresql+psycopg2",
+        username=c["user"],
+        password=c["password"],
+        host=c["host"],
+        port=c["port"],
+        database=c["database"],
     )
     return create_engine(url)
 
@@ -37,17 +41,28 @@ def create_schema(engine=None):
         raw.close()
 
 
-def load_all(data, recreate_schema=True):
-    """Carga el dataset limpio respetando el esquema relacional definitivo."""
-    engine = get_engine()
-    if recreate_schema:
-        create_schema(engine)
-
+def load_all(data, create_schema_if_missing=True):
+    """Reemplaza el dataset en una transacción, respetando las relaciones."""
     missing = set(LOAD_ORDER) - set(data)
     if missing:
         raise KeyError(f"Faltan tablas para cargar: {sorted(missing)}")
 
+    empty = [table_name for table_name in LOAD_ORDER if data[table_name].empty]
+    if empty:
+        raise ValueError(
+            f"No se reemplaza la carga con tablas vacías: {sorted(empty)}"
+        )
+
+    engine = get_engine()
+    if create_schema_if_missing:
+        create_schema(engine)
+
     with engine.begin() as conn:
+        # Delete child tables first. A failed load rolls back both deletes
+        # and inserts, leaving the previously loaded dataset available.
+        for table_name in reversed(LOAD_ORDER):
+            conn.execute(text(f'DELETE FROM "{table_name}"'))
+
         for table_name in LOAD_ORDER:
             df = data[table_name]
             df.to_sql(

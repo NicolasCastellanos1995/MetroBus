@@ -2,49 +2,39 @@
 
 from __future__ import annotations
 
-import time
+from threading import Event
 from pathlib import Path
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
+from .config import RAW_DIR
 from metrobus.pipeline import main
 
 
-RAW_DIR = Path("/app/data/raw")
-
-
 class CSVChangeHandler(FileSystemEventHandler):
-    """Ejecuta el pipeline cuando cambia un CSV."""
+    """Marca cambios CSV para procesarlos tras una pausa de escritura."""
 
     def __init__(self):
-        self.last_run = 0.0
+        self.change_detected = Event()
 
     def on_modified(self, event):
-        if event.is_directory:
+        self._mark_change(event, event.src_path)
+
+    def on_created(self, event):
+        self._mark_change(event, event.src_path)
+
+    def on_deleted(self, event):
+        self._mark_change(event, event.src_path)
+
+    def on_moved(self, event):
+        self._mark_change(event, event.dest_path)
+
+    def _mark_change(self, event, path):
+        if event.is_directory or Path(path).suffix.lower() != ".csv":
             return
 
-        path = Path(event.src_path)
-
-        if path.suffix.lower() != ".csv":
-            return
-
-        # Evita varias ejecuciones consecutivas por el mismo guardado.
-        now = time.time()
-
-        if now - self.last_run < 2:
-            return
-
-        self.last_run = now
-
-        print(f"\nCambio detectado: {path.name}")
-        print("Ejecutando pipeline...\n")
-
-        try:
-            main()
-            print("\nPipeline actualizado correctamente.")
-        except Exception as exc:
-            print(f"\nERROR durante el pipeline: {exc}")
+        self.change_detected.set()
 
 
 def main_watch():
@@ -73,7 +63,23 @@ def main_watch():
 
     try:
         while True:
-            time.sleep(1)
+            if not handler.change_detected.wait(timeout=1):
+                continue
+
+            # Espera a que terminen los guardados consecutivos antes de
+            # volver a cargar todos los CSV.
+            handler.change_detected.clear()
+            while handler.change_detected.wait(timeout=2):
+                handler.change_detected.clear()
+
+            print("\nCambio detectado en data/raw.")
+            print("Ejecutando pipeline...\n")
+
+            try:
+                main()
+                print("\nPipeline actualizado correctamente.")
+            except Exception as exc:
+                print(f"\nERROR durante el pipeline: {exc}")
 
     except KeyboardInterrupt:
         observer.stop()

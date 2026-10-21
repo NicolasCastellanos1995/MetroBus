@@ -35,7 +35,8 @@ jupyter notebook 01_eda.ipynb
 ```
 
 La fase SQL puede reproducirse mediante `02_sql.sql` sobre la base
-PostgreSQL generada.
+PostgreSQL generada. El notebook `02_sql_validaciones.ipynb` obtiene la
+conexión de la misma configuración `.env` que utiliza el ETL.
 
 Conexión local a PostgreSQL:
 
@@ -85,8 +86,7 @@ Conexión local a PostgreSQL:
 tfm/
 │
 ├── data/
-│   ├── raw/                    # CSV originales
-│   └── processed/              # Datos procesados si fueran necesarios
+│   └── raw/                    # CSV originales
 │
 ├── sql/
 │   └── schema.sql              # Esquema PostgreSQL
@@ -104,7 +104,7 @@ tfm/
 ├── 02_sql.sql                  # Consultas SQL de negocio
 ├── 03_gobierno.md              # Gobierno y calidad del dato
 ├── 04_dashboard.pbix           # Dashboard Power BI
-├── 05_presentacion.pdf         # Presentación ejecutiva
+├── 05_presentacion.pptx        # Presentación ejecutiva
 │
 ├── Dockerfile                  # Imagen del servicio ETL
 ├── docker-compose.yml          # PostgreSQL + ETL
@@ -120,13 +120,13 @@ El servicio ETL utiliza `watchdog` para monitorizar:
 data/raw/*.csv
 ```
 
-Cuando se modifica y guarda uno de los archivos:
+Cuando se modifica, crea, elimina o reemplaza uno de los archivos:
 
 ```text
-CSV modificado
+Cambio CSV
        │
        ▼
-watch.py detecta el cambio
+watch.py agrupa guardados consecutivos
        │
        ▼
 pipeline.py
@@ -149,7 +149,7 @@ data/raw/dim_linea.csv
 el contenedor detectará el cambio y mostrará:
 
 ```text
-Cambio detectado: dim_linea.csv
+Cambio detectado en data/raw.
 Ejecutando pipeline...
 
 1/3 Extrayendo CSV...
@@ -184,7 +184,7 @@ POWER BI
 
 Los archivos originales permanecen sin modificar.
 
-Las transformaciones están implementadas mediante código reproducible y no mediante modificaciones manuales de los CSV.
+Las transformaciones están implementadas mediante código reproducible y no mediante modificaciones manuales de los CSV. Cada carga sustituye los datos preparados dentro de una única transacción: si falla, la carga anterior permanece disponible. La creación del esquema no elimina las tablas existentes.
 
 ---
 

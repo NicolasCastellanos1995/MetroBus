@@ -154,6 +154,85 @@ def validate_all(
                 f"{child}.{fk}: {int(bad.sum())} FK huérfanas"
             )
 
+    # A valid FK is not enough for incidents: the referenced trip must
+    # describe the same vehicle, driver, line, and service date.
+    incidents = dfs["fact_incidencias"]
+    trips = (
+        dfs["fact_viajes"]
+        .drop_duplicates("viaje_id")
+        .set_index("viaje_id")
+    )
+
+    for column in ("vehiculo_id", "conductor_id", "linea_id"):
+        expected = incidents["viaje_id"].map(trips[column])
+        if incidents[column].ne(expected).any():
+            errors.append(
+                f"fact_incidencias.{column}: no coincide con el viaje asociado"
+            )
+
+    trip_dates = pd.to_datetime(
+        incidents["viaje_id"].map(trips["fecha"]),
+        errors="coerce",
+    )
+    incident_dates = pd.to_datetime(
+        incidents["fecha"],
+        errors="coerce",
+    )
+    dates_do_not_match = (
+        trip_dates.isna().any()
+        or incident_dates.isna().any()
+        or trip_dates.ne(incident_dates).any()
+    )
+    if dates_do_not_match:
+        errors.append(
+            "fact_incidencias.fecha: no coincide con la fecha del viaje asociado"
+        )
+
+    # Redundant calendar fields must remain consistent with their date.
+    dated_tables = {
+        "fact_viajes": "fecha",
+        "fact_incidencias": "fecha",
+        "fact_mantenimiento": "fecha_entrada",
+    }
+    for table, date_column in dated_tables.items():
+        dates = pd.to_datetime(dfs[table][date_column], errors="coerce")
+        years = pd.to_numeric(dfs[table]["anno"], errors="coerce")
+        months = pd.to_numeric(dfs[table]["mes"], errors="coerce")
+        if (
+            dates.isna().any()
+            or years.isna().any()
+            or months.isna().any()
+            or dates.dt.year.ne(years).any()
+            or dates.dt.month.ne(months).any()
+        ):
+            errors.append(
+                f"{table}: anno/mes no coincide con {date_column}"
+            )
+
+    maintenance = dfs["fact_mantenimiento"]
+    entry_dates = pd.to_datetime(
+        maintenance["fecha_entrada"],
+        errors="coerce",
+    )
+    exit_dates = pd.to_datetime(
+        maintenance["fecha_salida"],
+        errors="coerce",
+    )
+    maintenance_days = pd.to_numeric(
+        maintenance["dias_fuera_servicio"],
+        errors="coerce",
+    )
+    expected_days = (exit_dates - entry_dates).dt.days
+    if (
+        entry_dates.isna().any()
+        or exit_dates.isna().any()
+        or maintenance_days.isna().any()
+        or expected_days.ne(maintenance_days).any()
+    ):
+        errors.append(
+            "fact_mantenimiento.dias_fuera_servicio: no coincide con las fechas"
+        )
+
     # ---------------------------------------------------------
     # 3. Vehículos
     # ---------------------------------------------------------

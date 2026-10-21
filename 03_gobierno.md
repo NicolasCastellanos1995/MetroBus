@@ -551,9 +551,14 @@ anticipadas de pocos minutos (-1, -2, -3) se consideran puntuales.
 **Objetivo:** medir el retraso promedio respecto a la hora programada.
 
 **Fórmula:**\
-`AVG(fact_viajes[retraso_salida_min])`
+`AVG(GREATEST(fact_viajes[retraso_salida_min], 0))`
 
 **Unidad:** minutos.
+
+El promedio se calcula sobre todos los viajes; las salidas anticipadas y
+puntuales aportan cero minutos, por lo que no compensan retrasos de otros
+viajes. La puntualidad se mide por separado con el umbral definido en el
+KPI 3.
 
 ### KPI 5 --- Total de incidencias
 
@@ -662,6 +667,18 @@ Los ingresos calculados a partir de la tarifa predominante son
 estimaciones y no representan transacciones individuales ni facturación
 contable real.
 
+Los viajes abarcan 2022--2024, mientras que mantenimiento incluye 47
+intervenciones registradas en 2025. Ese último año es parcial y no debe
+compararse con años completos como si tuviera la misma exposición.
+El promedio anual de días fuera de servicio incluye todos los vehículos
+de la dimensión, asignando cero a los que no tuvieron intervenciones ese
+año. El modelo no conserva altas/bajas históricas de la flota, por lo que
+el denominador no representa una flota activa historizada.
+Asimismo, el coste de mantenimiento por kilómetro es descriptivo: no
+ajusta por antigüedad, intensidad de uso ni mezcla de intervenciones, por
+lo que no demuestra por sí solo una diferencia de eficiencia entre
+tecnologías.
+
 
 ## 7. Criterio de aceptación de calidad
 
@@ -678,5 +695,3 @@ El dataset se considera preparado para análisis cuando:
 -   PostgreSQL acepta la carga conforme a `sql/schema.sql`;
 -   las definiciones de KPI utilizadas en SQL y Power BI mantienen el
     mismo significado de negocio.
-
-

@@ -1,17 +1,7 @@
 -- MetroBus: esquema PostgreSQL definitivo.
--- Ejecutar antes de cargar los DataFrames transformados.
+-- La creación es idempotente y no elimina datos existentes.
 
-DROP TABLE IF EXISTS fact_incidencias CASCADE;
-DROP TABLE IF EXISTS fact_mantenimiento CASCADE;
-DROP TABLE IF EXISTS fact_viajes CASCADE;
-DROP TABLE IF EXISTS dim_conductor CASCADE;
-DROP TABLE IF EXISTS dim_vehiculo CASCADE;
-DROP TABLE IF EXISTS dim_linea CASCADE;
-DROP TABLE IF EXISTS dim_parada CASCADE;
-DROP TABLE IF EXISTS dim_tarifa CASCADE;
-DROP TABLE IF EXISTS dim_depot CASCADE;
-
-CREATE TABLE dim_depot (
+CREATE TABLE IF NOT EXISTS dim_depot (
     depot_id INTEGER PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     barrio VARCHAR(100) NOT NULL,
@@ -20,7 +10,7 @@ CREATE TABLE dim_depot (
     capacidad_vehiculos INTEGER NOT NULL CHECK (capacidad_vehiculos >= 0)
 );
 
-CREATE TABLE dim_linea (
+CREATE TABLE IF NOT EXISTS dim_linea (
     linea_id INTEGER PRIMARY KEY,
     codigo VARCHAR(20) NOT NULL,
     nombre VARCHAR(150) NOT NULL,
@@ -30,7 +20,7 @@ CREATE TABLE dim_linea (
     frecuencia_min INTEGER NOT NULL CHECK (frecuencia_min > 0)
 );
 
-CREATE TABLE dim_parada (
+CREATE TABLE IF NOT EXISTS dim_parada (
     parada_id INTEGER PRIMARY KEY,
     nombre_parada VARCHAR(150) NOT NULL,
     barrio VARCHAR(100) NOT NULL,
@@ -43,7 +33,7 @@ CREATE TABLE dim_parada (
     activa BOOLEAN NOT NULL
 );
 
-CREATE TABLE dim_tarifa (
+CREATE TABLE IF NOT EXISTS dim_tarifa (
     tarifa_id INTEGER PRIMARY KEY,
     tipo_titulo VARCHAR(100) NOT NULL,
     categoria VARCHAR(50) NOT NULL,
@@ -52,7 +42,7 @@ CREATE TABLE dim_tarifa (
     bonificado BOOLEAN NOT NULL
 );
 
-CREATE TABLE dim_vehiculo (
+CREATE TABLE IF NOT EXISTS dim_vehiculo (
     vehiculo_id INTEGER PRIMARY KEY,
     matricula VARCHAR(30) NOT NULL UNIQUE,
     modelo VARCHAR(100) NOT NULL,
@@ -68,7 +58,7 @@ CREATE TABLE dim_vehiculo (
     CHECK (anno_fabricacion <= anno_incorporacion)
 );
 
-CREATE TABLE dim_conductor (
+CREATE TABLE IF NOT EXISTS dim_conductor (
     conductor_id INTEGER PRIMARY KEY,
     nombre VARCHAR(120) NOT NULL,
     anno_incorporacion INTEGER NOT NULL,
@@ -81,7 +71,7 @@ CREATE TABLE dim_conductor (
     ausencias_2024 INTEGER NOT NULL CHECK (ausencias_2024 >= 0)
 );
 
-CREATE TABLE fact_viajes (
+CREATE TABLE IF NOT EXISTS fact_viajes (
     viaje_id INTEGER PRIMARY KEY,
     linea_id INTEGER NOT NULL REFERENCES dim_linea(linea_id),
     vehiculo_id INTEGER NOT NULL REFERENCES dim_vehiculo(vehiculo_id),
@@ -108,7 +98,7 @@ CREATE TABLE fact_viajes (
     tarifa_predominante_id INTEGER NOT NULL REFERENCES dim_tarifa(tarifa_id)
 );
 
-CREATE TABLE fact_incidencias (
+CREATE TABLE IF NOT EXISTS fact_incidencias (
     incidencia_id INTEGER PRIMARY KEY,
     viaje_id INTEGER NOT NULL REFERENCES fact_viajes(viaje_id),
     vehiculo_id INTEGER NOT NULL REFERENCES dim_vehiculo(vehiculo_id),
@@ -127,7 +117,7 @@ CREATE TABLE fact_incidencias (
     coste_estimado_eur NUMERIC(12,2) NOT NULL CHECK (coste_estimado_eur >= 0)
 );
 
-CREATE TABLE fact_mantenimiento (
+CREATE TABLE IF NOT EXISTS fact_mantenimiento (
     mantenimiento_id INTEGER PRIMARY KEY,
     vehiculo_id INTEGER NOT NULL REFERENCES dim_vehiculo(vehiculo_id),
     depot_id INTEGER NOT NULL REFERENCES dim_depot(depot_id),
@@ -146,10 +136,10 @@ CREATE TABLE fact_mantenimiento (
     CHECK (fecha_salida >= fecha_entrada)
 );
 
-CREATE INDEX idx_viajes_fecha ON fact_viajes(fecha);
-CREATE INDEX idx_viajes_linea ON fact_viajes(linea_id);
-CREATE INDEX idx_viajes_vehiculo ON fact_viajes(vehiculo_id);
-CREATE INDEX idx_incidencias_tipo ON fact_incidencias(tipo_incidencia);
-CREATE INDEX idx_incidencias_fecha ON fact_incidencias(fecha);
-CREATE INDEX idx_mantenimiento_vehiculo ON fact_mantenimiento(vehiculo_id);
-CREATE INDEX idx_mantenimiento_fecha ON fact_mantenimiento(fecha_entrada);
+CREATE INDEX IF NOT EXISTS idx_viajes_fecha ON fact_viajes(fecha);
+CREATE INDEX IF NOT EXISTS idx_viajes_linea ON fact_viajes(linea_id);
+CREATE INDEX IF NOT EXISTS idx_viajes_vehiculo ON fact_viajes(vehiculo_id);
+CREATE INDEX IF NOT EXISTS idx_incidencias_tipo ON fact_incidencias(tipo_incidencia);
+CREATE INDEX IF NOT EXISTS idx_incidencias_fecha ON fact_incidencias(fecha);
+CREATE INDEX IF NOT EXISTS idx_mantenimiento_vehiculo ON fact_mantenimiento(vehiculo_id);
+CREATE INDEX IF NOT EXISTS idx_mantenimiento_fecha ON fact_mantenimiento(fecha_entrada);
